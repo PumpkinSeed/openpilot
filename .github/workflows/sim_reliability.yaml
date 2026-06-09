@@ -55,6 +55,7 @@ jobs:
           LOG_ROOT: ${{ github.workspace }}/sim_logs
         run: |
           source selfdrive/test/setup_xvfb.sh
+          source selfdrive/test/setup_vsound.sh  # soundd needs an audio sink, else it exits -> processNotRunning
           pytest -s tools/sim/tests/test_metadrive_bridge.py
       - name: Upload simulation logs
         if: always()
