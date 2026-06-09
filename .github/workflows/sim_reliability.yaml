@@ -1,0 +1,66 @@
+name: sim reliability
+
+# Manually-triggered harness to prove the MetaDrive driving test is reliable
+# (issue #30693 requires "passes 20+ times in a row"). Runs the test N times in
+# parallel; the job only goes green if every run passes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'Number of consecutive runs to attempt'
+        default: '20'
+        required: true
+        type: string
+
+concurrency:
+  group: sim-reliability-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 1
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  prepare:
+    name: prepare matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        run: echo "matrix=$(python3 -c "import json; print(json.dumps(list(range(1, ${{ github.event.inputs.runs }} + 1))))")" >> "$GITHUB_OUTPUT"
+
+  driving:
+    name: driving (${{ matrix.run }}/${{ github.event.inputs.runs }})
+    needs: prepare
+    runs-on: ${{
+      (github.repository == 'commaai/openpilot') &&
+      fromJSON('["namespace-profile-amd64-8x16"]')
+      || fromJSON('["ubuntu-24.04"]') }}
+    strategy:
+      fail-fast: false  # run them all so flakiness shows up as a pass-rate, not first-failure
+      matrix:
+        run: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - run: ./tools/op.sh setup
+      - name: Build openpilot
+        run: scons
+      - name: Driving test
+        timeout-minutes: 5
+        env:
+          LOG_ROOT: ${{ github.workspace }}/sim_logs
+        run: |
+          source selfdrive/test/setup_xvfb.sh
+          pytest -s tools/sim/tests/test_metadrive_bridge.py
+      - name: Upload simulation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadrive-sim-logs-run-${{ matrix.run }}
+          path: ${{ github.workspace }}/sim_logs
+          if-no-files-found: ignore
+          retention-days: 7

@@ -28,6 +28,7 @@ from openpilot.selfdrive.modeld.helpers import usbgpu_present, modeld_pkl_path, 
 
 PROCESS_NAME = "selfdrive.modeld.modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
+SIMULATION = "SIMULATION" in os.environ
 
 LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
@@ -283,7 +284,10 @@ def main(demo=False):
     run_count = run_count + 1
 
     frame_drop_ratio = frames_dropped / (1 + frames_dropped)
-    prepare_only = vipc_dropped_frames > 0
+    # In the simulator on CPU-only CI, the model can't keep up with the 20Hz frame
+    # producer. Skipping eval on every drop would mean modelV2 is never published,
+    # so the stack never engages. Instead, always eval the latest available frame.
+    prepare_only = vipc_dropped_frames > 0 and not SIMULATION
     if prepare_only:
       cloudlog.error(f"skipping model eval. Dropped {vipc_dropped_frames} frames")
 
