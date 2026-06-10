@@ -6,7 +6,9 @@ export SIMULATION="1"
 export SKIP_FW_QUERY="1"
 export FINGERPRINT="HONDA_CIVIC_2022"
 
-export BLOCK="${BLOCK},camerad,loggerd,encoderd,micd,logmessaged,manage_athenad"
+# keep loggerd + encoderd running so qlog/rlog and camera files are produced for CI artifacts.
+# camerad stays blocked (the bridge feeds frames over VisionIPC instead).
+export BLOCK="${BLOCK},camerad,micd,logmessaged,manage_athenad"
 if [[ "$CI" ]]; then
   # TODO: offscreen UI should work
   export BLOCK="${BLOCK},ui"

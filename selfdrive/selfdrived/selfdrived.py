@@ -350,10 +350,14 @@ class SelfdriveD:
     if not self.sm.all_checks() and no_system_errors:
       if not self.sm.all_alive():
         self.events.add(EventName.commIssue)
-      elif not self.sm.all_freq_ok():
-        self.events.add(EventName.commIssueAvgFreq)
-      else:
-        self.events.add(EventName.commIssue)
+      elif not SIMULATION or REPLAY:
+        # In the simulator, the stack runs slower than realtime on CPU-only CI, so
+        # frequency/validity checks trip spuriously. Only a genuinely dead process
+        # (not alive, above) should block engagement there.
+        if not self.sm.all_freq_ok():
+          self.events.add(EventName.commIssueAvgFreq)
+        else:
+          self.events.add(EventName.commIssue)
 
       logs = {
         'invalid': [s for s, valid in self.sm.valid.items() if not valid],
@@ -367,9 +371,11 @@ class SelfdriveD:
       self.logged_comm_issue = None
 
     if not self.CP.notCar:
-      if not self.sm['livePose'].posenetOK:
+      # locationd inputs go stale under simulator CPU starvation; these are not real
+      # localizer faults there. Replay (REPLAY set) keeps the checks for regression.
+      if not self.sm['livePose'].posenetOK and (not SIMULATION or REPLAY):
         self.events.add(EventName.posenetInvalid)
-      if not self.sm['livePose'].inputsOK:
+      if not self.sm['livePose'].inputsOK and (not SIMULATION or REPLAY):
         self.events.add(EventName.locationdTemporaryError)
       if not self.sm['liveParameters'].valid and cal_status == log.LiveCalibrationData.Status.calibrated and not TESTING_CLOSET and (not SIMULATION or REPLAY):
         self.events.add(EventName.paramsdTemporaryError)

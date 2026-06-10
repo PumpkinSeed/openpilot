@@ -73,7 +73,7 @@ class TestSimBridgeBase:
 
     failure_states = []
     while bridge.started.value:
-      continue
+      time.sleep(0.1)  # don't busy-wait; a spinning core starves modeld on CI
 
     while not q.empty():
       state = q.get()
